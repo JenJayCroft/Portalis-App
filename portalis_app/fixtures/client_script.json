@@ -1,0 +1,134 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "HRSN Case",
+  "enabled": 1,
+  "modified": "2025-11-19 14:16:38.276051",
+  "module": null,
+  "name": "Total Household Income",
+  "script": "frappe.ui.form.on('HRSN Case', {\r\n    refresh: function(frm) {\r\n        sync_household_to_income(frm);\r\n        calculate_total_income(frm);\r\n    },\r\n    validate: function(frm) {\r\n        sync_household_to_income(frm);\r\n        calculate_total_income(frm);\r\n    }\r\n});\r\n\r\n// --- WATCHING THE HOUSEHOLD MEMBER TABLE ---\r\nfrappe.ui.form.on('Household Member', {\r\n    member_name: function(frm) { sync_household_to_income(frm); },\r\n    // Watch the Date of Birth field specifically\r\n    member_dob: function(frm) { sync_household_to_income(frm); },\r\n    \r\n    household_member_detail_remove: function(frm) { \r\n        sync_household_to_income(frm); \r\n        calculate_total_income(frm);\r\n    }\r\n});\r\n\r\n// --- WATCHING THE INCOME TABLE ---\r\nfrappe.ui.form.on('Household Income Entry', {\r\n    monthly_income: function(frm) { calculate_total_income(frm); },\r\n    household_income_table_remove: function(frm) { calculate_total_income(frm); }\r\n});\r\n\r\n// --- HELPER: CALCULATE AGE ---\r\nvar get_age = function(dateString) {\r\n    if (!dateString) return 0;\r\n    var today = new Date();\r\n    var birthDate = new Date(dateString);\r\n    var age = today.getFullYear() - birthDate.getFullYear();\r\n    var m = today.getMonth() - birthDate.getMonth();\r\n    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {\r\n        age--;\r\n    }\r\n    return age;\r\n};\r\n\r\n// --- SYNC FUNCTION ---\r\nvar sync_household_to_income = function(frm) {\r\n    let household_members = frm.doc.household_member_detail || [];\r\n    let income_rows = frm.doc.household_income_table || [];\r\n    \r\n    // Filter: Only members with a Name AND Age >= 18\r\n    let adults = household_members.filter(d => {\r\n        return d.member_name && get_age(d.member_dob) >= 18;\r\n    });\r\n\r\n    // A. ADD LOOP: Add qualifying adults\r\n    adults.forEach(adult => {\r\n        let existing = income_rows.find(r => r.member_name === adult.member_name);\r\n        if (!existing) {\r\n            let new_row = frm.add_child('household_income_table');\r\n            new_row.member_name = adult.member_name;\r\n            new_row.monthly_income = 0; \r\n        }\r\n    });\r\n\r\n    // B. REMOVE LOOP: Remove non-adults or deleted members\r\n    if (frm.doc.household_income_table) {\r\n        for (let i = frm.doc.household_income_table.length - 1; i >= 0; i--) {\r\n            let row = frm.doc.household_income_table[i];\r\n            // Check if this person is still in the 'adults' list we just calculated\r\n            let still_qualifies = adults.find(a => a.member_name === row.member_name);\r\n            \r\n            if (!still_qualifies) {\r\n                frm.doc.household_income_table.splice(i, 1);\r\n            }\r\n        }\r\n    }\r\n\r\n    frm.refresh_field('household_income_table');\r\n};\r\n\r\n// --- CALC FUNCTION ---\r\nvar calculate_total_income = function(frm) {\r\n    let total_income = 0;\r\n    if (frm.doc.household_income_table) {\r\n        frm.doc.household_income_table.forEach(d => {\r\n            total_income += (d.monthly_income || 0);\r\n        });\r\n    }\r\n    frm.set_value('total_household_monthly_income', total_income);\r\n    frm.refresh_field('total_household_monthly_income');\r\n};",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "HRSN Case",
+  "enabled": 1,
+  "modified": "2025-11-21 09:20:04.979592",
+  "module": null,
+  "name": "Calculate Service End",
+  "script": "frappe.ui.form.on('HRSN Service Authorization', {\r\n    service_category: function(frm, cdt, cdn) {\r\n        // Trigger date calculation if category changes (and date exists)\r\n        var row = locals[cdt][cdn];\r\n        if (row.effective_start_date) {\r\n            calculate_end_date(frm, cdt, cdn);\r\n        }\r\n    },\r\n    effective_start_date: function(frm, cdt, cdn) {\r\n        calculate_end_date(frm, cdt, cdn);\r\n    }\r\n});\r\n\r\nvar calculate_end_date = function(frm, cdt, cdn) {\r\n    var row = locals[cdt][cdn];\r\n    if (!row.effective_start_date || !row.service_category) return;\r\n\r\n    var start_date = new Date(row.effective_start_date);\r\n    var future_date;\r\n\r\n    // LOGIC A: 6-Month \"Snap to Month\" (Rent, Utilities, Storage)\r\n    // Rule: Cover full monthly blocks. Nov 21 -> April 30.\r\n    if ([\"Rent Assistance\", \"Utility Assistance\", \"Storage Support\"].includes(row.service_category)) {\r\n        // 1. Snap to 1st of the start month\r\n        var first_of_month = new Date(start_date.getFullYear(), start_date.getMonth(), 1);\r\n        \r\n        // 2. Add 6 months to get the start of the 7th month\r\n        var start_of_seventh = new Date(first_of_month.setMonth(first_of_month.getMonth() + 6));\r\n        \r\n        // 3. Subtract 1 day to get the last day of the 6th month\r\n        future_date = frappe.datetime.add_days(start_of_seventh, -1);\r\n    } \r\n    \r\n    // LOGIC B: 18-Month Exact Duration (Tenancy Support)\r\n    // Rule: 18 months from the specific start date.\r\n    else if ([\"Tenancy Support\", \"Pre-Tenancy Services\"].includes(row.service_category)) {\r\n        // Add 548 days (approx 18 months)\r\n        future_date = frappe.datetime.add_months(row.effective_start_date, 18);\r\n    }\r\n\r\n    if (future_date) {\r\n        frappe.model.set_value(cdt, cdn, 'effective_end_date', frappe.datetime.obj_to_str(future_date));\r\n    }\r\n};",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "HRSN Case",
+  "enabled": 1,
+  "modified": "2025-11-21 10:13:56.431333",
+  "module": "Client Management",
+  "name": "Authorization Expired",
+  "script": "frappe.ui.form.on('HRSN Case', {\r\n    validate: function(frm) {\r\n        validate_activity_dates(frm);\r\n    }\r\n});\r\n\r\nvar validate_activity_dates = function(frm) {\r\n    if (!frm.doc.activity_logs || !frm.doc.service_authorizations) return;\r\n\r\n    // 1. Build a map of Approved Dates per Service Category\r\n    // Format: { \"Tenancy Support\": {start: \"2025-01-01\", end: \"2026-06-01\"}, ... }\r\n    let auth_map = {};\r\n    \r\n    frm.doc.service_authorizations.forEach(auth => {\r\n        if (auth.status === \"Active\" && auth.effective_start_date) {\r\n            auth_map[auth.service_category] = {\r\n                start: new Date(auth.effective_start_date),\r\n                // If no end date (open ended), use a far future date\r\n                end: auth.effective_end_date ? new Date(auth.effective_end_date) : new Date('2099-12-31')\r\n            };\r\n        }\r\n    });\r\n\r\n    // 2. Check every Activity Log entry against the map\r\n    frm.doc.activity_logs.forEach(log => {\r\n        // Skip if we can't find a matching authorization category\r\n        // (Note: You need to make sure 'Activity Type' in log matches 'Service Category' in Auth)\r\n        if (auth_map[log.activity_type]) {\r\n            let log_date = new Date(log.date_of_service);\r\n            let range = auth_map[log.activity_type];\r\n\r\n            // Check if Date of Service is outside the Approved Range\r\n            if (log_date < range.start || log_date > range.end) {\r\n                frappe.msgprint({\r\n                    title: 'Billing Error',\r\n                    message: `Activity on <b>${log.date_of_service}</b> for ${log.activity_type} is outside the authorized dates.<br>Authorized: ${range.start.toDateString()} to ${range.end.toDateString()}`,\r\n                    indicator: 'red'\r\n                });\r\n                frappe.validated = false; // Block the Save\r\n            }\r\n        } else {\r\n            // Optional: Block saving if there is NO authorization at all for this activity\r\n            // frappe.msgprint(`No Active Authorization found for ${log.activity_type}`);\r\n            // frappe.validated = false;\r\n        }\r\n    });\r\n};",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "HRSN Case",
+  "enabled": 1,
+  "modified": "2025-11-25 14:19:07.201074",
+  "module": null,
+  "name": "Generate Intake Button",
+  "script": "frappe.ui.form.on('HRSN Case', {\r\n    refresh: function(frm) {\r\n        // Only show button if the case is saved\r\n        if (!frm.is_new()) {\r\n            frm.add_custom_button(__('Generate Intake Packet'), function() {\r\n                \r\n                // Call the API Server Script we just made\r\n                frappe.call({\r\n                    method: 'generate_intake_packet',\r\n                    args: {\r\n                        'case_name': frm.doc.name\r\n                    },\r\n                    freeze: true,\r\n                    freeze_message: \"Generating Packet...\",\r\n                    callback: function(r) {\r\n                        // Reload to see any updates if needed\r\n                        frm.reload_doc();\r\n                    }\r\n                });\r\n            }, \"Actions\"); // Puts it under an \"Actions\" button group\r\n        }\r\n    }\r\n});",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "HRSN Activity Log",
+  "enabled": 1,
+  "modified": "2025-11-26 07:48:02.418694",
+  "module": "Client Management",
+  "name": "Constraint Enforcer",
+  "script": "// Client Script: HRSN Activity Log\r\nfrappe.ui.form.on('HRSN Activity Log', {\r\n    refresh: function(frm) {\r\n        // 1. Auto-Set Procedure Code based on Category\r\n        // T1017 = Outreach , H2015 = Tenancy \r\n        if (frm.doc.activity_category == \"Engagement (O&E)\") {\r\n            frm.set_value('procedure_code', 'T1017');\r\n        } else if (frm.doc.activity_category == \"Tenancy Support\") {\r\n            frm.set_value('procedure_code', 'H2015');\r\n        }\r\n    },\r\n\r\n    activity_category: function(frm) {\r\n        // Trigger same logic if user changes category\r\n        if (frm.doc.activity_category == \"Engagement (O&E)\") {\r\n            frm.set_value('procedure_code', 'T1017');\r\n        } else if (frm.doc.activity_category == \"Tenancy Support\") {\r\n            frm.set_value('procedure_code', 'H2015');\r\n        }\r\n    },\r\n\r\n    time_spent: function(frm) {\r\n        // 2. Auto-Calculate Billable Units\r\n        if (frm.doc.time_spent) {\r\n            frm.set_value('billable_units', frm.doc.time_spent / 15);\r\n        }\r\n    }\r\n});",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "HRSN Case",
+  "enabled": 0,
+  "modified": "2025-12-03 12:32:28.642502",
+  "module": null,
+  "name": "HRSN Case List Styling",
+  "script": "frappe.listview_settings['HRSN Case'] = {\r\n    add_fields: [\"service_status\", \"case_manager\"],\r\n    \r\n    get_indicator: function(doc) {\r\n        // RED: Accepted but no Case Manager yet (Urgent)\r\n        if (doc.service_status === \"Accepted\" && !doc.case_manager) {\r\n            return [__(\"Needs Assignment\"), \"red\", \"service_status,=,Accepted\"];\r\n        }\r\n        \r\n        // ORANGE: Waiting on CCO (Bottleneck)\r\n        if (doc.service_status === \"Pending CCO Approval\") {\r\n            return [__(\"Pending CCO\"), \"orange\", \"service_status,=,Pending CCO Approval\"];\r\n        }\r\n        \r\n        // BLUE: Intake in Progress\r\n        if (doc.service_status === \"Intake in Progress\") {\r\n            return [__(\"Intake\"), \"blue\", \"service_status,=,Intake in Progress\"];\r\n        }\r\n\r\n        // GREEN: Active and Good\r\n        if (doc.service_status === \"Active Case Mgmt\") {\r\n            return [__(\"Active\"), \"green\", \"service_status,=,Active Case Mgmt\"];\r\n        }\r\n        \r\n        // PURPLE: Active Appeal\r\n        if (doc.service_status === \"Appealed\") {\r\n            return [__(\"Appealed\"), \"purple\", \"service_status,=,Appealed\"];\r\n        }\r\n        \r\n        // GREY: Everything else\r\n        return [__(doc.service_status), \"grey\", \"service_status,=,\" + doc.service_status];\r\n    }\r\n};",
+  "view": "List"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Client Intake Form - About Me",
+  "enabled": 1,
+  "modified": "2025-12-18 12:41:21.620731",
+  "module": "Client Management",
+  "name": "Client Intake-About Me",
+  "script": "frappe.ui.form.on(cur_frm.doctype, {\n  refresh(frm) {\n    // Only show for authorized roles\n    const allowed = frappe.user.has_role(\"Intake Specialist\") || frappe.user.has_role(\"Program Manager\");\n    if (!allowed) return;\n\n    // Only show button when approved to sync\n    const status = frm.doc.intake_status || frm.doc.workflow_state;\n    if (status !== \"Approved to Sync\") return;\n\n    frm.add_custom_button(\"Sync to Case\", async () => {\n      frm.disable_save();\n\n      try {\n        const r = await frappe.call({\n          method: \"synch_intake_to_case\",\n          args: {\n            intake_doctype: frm.doc.doctype,\n            intake_doc_name: frm.doc.name\n          }\n        });\n\n        const msg = r.message || {};\n        frappe.msgprint({\n          title: \"Synced\",\n          message: `Synced to case: ${msg.case || \"(unknown)\"}`,\n          indicator: \"green\"\n        });\n\n        await frm.reload_doc();\n      } finally {\n        frm.enable_save();\n      }\n    }).addClass(\"btn-primary\");\n  }\n});\n",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Client Intake Form - Housing and Utilities",
+  "enabled": 1,
+  "modified": "2025-12-26 12:31:14.274827",
+  "module": "Client Management",
+  "name": "Client Intake-Housing",
+  "script": "// Client Script (JavaScript)\n// DocType: (use the DocType this script is attached to)\n\nfunction normalize(v) {\n  return (v || \"\").toString().trim();\n}\n\nfunction build_account_key(row) {\n  const client = normalize(row.client);\n  const utility_type = normalize(row.utility_type);\n  const supplier = normalize(row.supplier_name);\n  const acct = normalize(row.account_number);\n\n  // Only generate a key when the row has the identifying fields\n  if (!client && !utility_type && !supplier && !acct) return \"\";\n\n  return `${client}|${utility_type}|${supplier}|${acct}`.toLowerCase().trim();\n}\n\nfunction set_row_account_key(cdt, cdn) {\n  const row = locals[cdt][cdn];\n  const key = build_account_key(row);\n\n  // Requires you to have a Data field \"account_key\" on Client Vendor Accounts (hidden/read-only recommended)\n  if (row.account_key !== key) {\n    frappe.model.set_value(cdt, cdn, \"account_key\", key);\n  }\n}\n\nfunction validate_no_duplicates(frm) {\n  const rows = frm.doc.utility_accounts || [];\n  const seen = new Set();\n\n  for (let i = 0; i < rows.length; i++) {\n    const r = rows[i];\n    const key = build_account_key(r);\n\n    // Keep account_key in sync during validation too\n    if (r.doctype && r.name) {\n      const current = normalize(r.account_key);\n      if (current !== key) {\n        frappe.model.set_value(r.doctype, r.name, \"account_key\", key);\n      }\n    }\n\n    // Only enforce duplicate check when we have enough info to identify the account\n    if (!key || key === \"|||\") continue;\n\n    if (seen.has(key)) {\n      frappe.throw(\n        `Duplicate Utility Account detected in row ${i + 1}. Please remove the duplicate or correct the details.`\n      );\n    }\n    seen.add(key);\n  }\n}\n\nfrappe.ui.form.on(cur_frm.doctype, {\n  refresh(frm) {\n    // Only show for authorized roles\n    const allowed =\n      frappe.user.has_role(\"Intake Specialist\") ||\n      frappe.user.has_role(\"Program Manager\");\n    if (!allowed) return;\n\n    // Only show button when approved to sync\n    const status = frm.doc.intake_status || frm.doc.workflow_state;\n    if (status !== \"Approved to Sync\") return;\n\n    frm.add_custom_button(\"Sync to Case\", async () => {\n      frm.disable_save();\n\n      try {\n        const r = await frappe.call({\n          method: \"synch_intake_to_case\",\n          args: {\n            intake_doctype: frm.doc.doctype,\n            intake_doc_name: frm.doc.name\n          }\n        });\n\n        const msg = r.message || {};\n        frappe.msgprint({\n          title: \"Synced\",\n          message: `Synced to case: ${msg.case || \"(unknown)\"}`,\n          indicator: \"green\"\n        });\n\n        await frm.reload_doc();\n      } finally {\n        frm.enable_save();\n      }\n    }).addClass(\"btn-primary\");\n  },\n\n  // Runs on Save (client-side)\n  validate(frm) {\n    validate_no_duplicates(frm);\n  },\n\n  // Runs when a new row is added to the child table\n  utility_accounts_add(frm, cdt, cdn) {\n    set_row_account_key(cdt, cdn);\n  }\n});\n\n// Child table field triggers\nfrappe.ui.form.on(\"Client Vendor Accounts\", {\n  client(frm, cdt, cdn) {\n    set_row_account_key(cdt, cdn);\n  },\n  utility_type(frm, cdt, cdn) {\n    set_row_account_key(cdt, cdn);\n  },\n  supplier_name(frm, cdt, cdn) {\n    set_row_account_key(cdt, cdn);\n  },\n  account_number(frm, cdt, cdn) {\n    set_row_account_key(cdt, cdn);\n  }\n});\n",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Client Intake Form - Income",
+  "enabled": 1,
+  "modified": "2025-12-26 12:33:43.245062",
+  "module": "Client Management",
+  "name": "Client Intake-Income",
+  "script": "// Client Script\n// DocType: Client Intake Form - Income\n\nfunction normalize(v) {\n  return (v || \"\").toString().trim();\n}\n\nfunction build_income_key(row) {\n  const member = normalize(row.member_name);\n  const source = normalize(row.income_source);\n\n  if (!member && !source) return \"\";\n  return `${member}|${source}`.toLowerCase().trim();\n}\n\nfunction set_income_ref_id(cdt, cdn) {\n  const row = locals[cdt][cdn];\n  if (!row) return;\n\n  const key = build_income_key(row);\n  if (row.ref_id !== key) {\n    frappe.model.set_value(cdt, cdn, \"ref_id\", key);\n  }\n}\n\nfunction validate_income_table(frm) {\n  const has_income = frm.doc.has_income === \"Yes\";\n  const rows = frm.doc.total_household_income || [];\n\n  // Only enforce when the table is in use\n  if (!has_income) return;\n\n  const seen = new Set();\n\n  for (let i = 0; i < rows.length; i++) {\n    const r = rows[i];\n\n    // Keep ref_id synced for each row\n    if (r.doctype && r.name) {\n      const key = build_income_key(r);\n      if (normalize(r.ref_id) !== key) {\n        frappe.model.set_value(r.doctype, r.name, \"ref_id\", key);\n      }\n    }\n\n    // Optional guardrail\n    if (r.monthly_income != null && r.monthly_income < 0) {\n      frappe.throw(`Row ${i + 1}: Monthly Income cannot be negative.`);\n    }\n\n    const key = normalize(r.ref_id) || build_income_key(r);\n    if (!key) continue; // ignore blank rows\n\n    if (seen.has(key)) {\n      frappe.throw(\n        `Duplicate income entry detected in row ${i + 1} (same Member Name + Income Source).`\n      );\n    }\n    seen.add(key);\n  }\n}\n\nfrappe.ui.form.on(\"Client Intake Form - Income\", {\n  refresh(frm) {\n    // Only show for authorized roles\n    const allowed =\n      frappe.user.has_role(\"Intake Specialist\") ||\n      frappe.user.has_role(\"Program Manager\");\n    if (!allowed) return;\n\n    // Only show button when approved to sync\n    const status = frm.doc.intake_status || frm.doc.workflow_state;\n    if (status !== \"Approved to Sync\") return;\n\n    frm\n      .add_custom_button(\"Sync to Case\", async () => {\n        frm.disable_save();\n\n        try {\n          const r = await frappe.call({\n            method: \"synch_intake_to_case\",\n            args: {\n              intake_doctype: frm.doc.doctype,\n              intake_doc_name: frm.doc.name\n            }\n          });\n\n          const msg = r.message || {};\n          frappe.msgprint({\n            title: \"Synced\",\n            message: `Synced to case: ${msg.case || \"(unknown)\"}`,\n            indicator: \"green\"\n          });\n\n          await frm.reload_doc();\n        } finally {\n          frm.enable_save();\n        }\n      })\n      .addClass(\"btn-primary\");\n  },\n\n  validate(frm) {\n    validate_income_table(frm);\n  },\n\n  // Child table row added\n  total_household_income_add(frm, cdt, cdn) {\n    set_income_ref_id(cdt, cdn);\n  }\n});\n\n// Child table field change handlers\nfrappe.ui.form.on(\"Household Income Entry\", {\n  member_name(frm, cdt, cdn) {\n    set_income_ref_id(cdt, cdn);\n  },\n  income_source(frm, cdt, cdn) {\n    set_income_ref_id(cdt, cdn);\n  }\n});\n",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Client Intake Form - ROI Attestations and Certifications",
+  "enabled": 1,
+  "modified": "2025-12-18 12:43:31.270174",
+  "module": "Client Management",
+  "name": "Client Intake-ROI",
+  "script": "frappe.ui.form.on(cur_frm.doctype, {\n  refresh(frm) {\n    // Only show for authorized roles\n    const allowed = frappe.user.has_role(\"Intake Specialist\") || frappe.user.has_role(\"Program Manager\");\n    if (!allowed) return;\n\n    // Only show button when approved to sync\n    const status = frm.doc.intake_status || frm.doc.workflow_state;\n    if (status !== \"Approved to Sync\") return;\n\n    frm.add_custom_button(\"Sync to Case\", async () => {\n      frm.disable_save();\n\n      try {\n        const r = await frappe.call({\n          method: \"synch_intake_to_case\",\n          args: {\n            intake_doctype: frm.doc.doctype,\n            intake_doc_name: frm.doc.name\n          }\n        });\n\n        const msg = r.message || {};\n        frappe.msgprint({\n          title: \"Synced\",\n          message: `Synced to case: ${msg.case || \"(unknown)\"}`,\n          indicator: \"green\"\n        });\n\n        await frm.reload_doc();\n      } finally {\n        frm.enable_save();\n      }\n    }).addClass(\"btn-primary\");\n  }\n});\n",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "HRSN Case",
+  "enabled": 0,
+  "modified": "2025-12-18 14:35:40.886531",
+  "module": null,
+  "name": "Generate 6 Months",
+  "script": "frappe.ui.form.on(\"HRSN Case\", {\n  refresh(frm) {\n    const allowed = frappe.user.has_role(\"Intake Specialist\") || frappe.user.has_role(\"Program Manager\");\n    if (!allowed) return;\n\n    frm.add_custom_button(\"Generate 6 Billing Months\", async () => {\n      if (!frm.doc.first_billing_month) {\n        frappe.msgprint(\"Set First Billing Month before generating.\");\n        return;\n      }\n\n      // If months already exist, avoid accidental overwrite\n      if ((frm.doc.billing_months || []).length) {\n        const ok = await frappe.confirm(\n          \"Billing months already exist. Regenerate and overwrite them?\",\n          () => true,\n          () => false\n        );\n        if (!ok) return;\n\n        frm.clear_table(\"billing_months\");\n      }\n\n      const m0 = moment(frm.doc.first_billing_month).startOf(\"month\"); // Month 1\n      for (let i = 0; i < 6; i++) {\n        const m = moment(m0).add(i, \"months\").startOf(\"month\");\n        const row = frm.add_child(\"billing_months\");\n        row.billing_month = m.format(\"YYYY-MM-DD\");\n        row.is_first_month = (i === 0) ? 1 : 0;\n        row.month_status = \"Planned\";\n        row.rent_ledger_status = \"Missing\";\n        row.utility_docs_status = \"Missing\";\n      }\n\n      await frm.save();\n      frappe.msgprint(\"Generated 6 billing months.\");\n    });\n  }\n});\n",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "HRSN Case",
+  "enabled": 0,
+  "modified": "2025-12-18 14:39:35.664797",
+  "module": "Client Management",
+  "name": "Month Payments",
+  "script": "async function render_month_payments(frm) {\n  const panel = frm.fields_dict.month_payments_panel;\n  if (!panel) return;\n\n  const month = frm.doc.selected_billing_month;\n  if (!month) {\n    panel.$wrapper.html(\"<div>Select a billing month to see vendor payments.</div>\");\n    return;\n  }\n\n  const rows = await frappe.db.get_list(\"HRSN Month Payment\", {\n    fields: [\"billing_month\", \"payment_type\", \"vendor\", \"amount\", \"status\", \"paid_date\", \"reference\"],\n    filters: {\n      hrsn_case: frm.doc.name,\n      billing_month: moment(month).startOf(\"month\").format(\"YYYY-MM-DD\")\n    },\n    limit: 200\n  });\n\n  let total = 0;\n  const body = rows.map(r => {\n    total += (r.amount || 0);\n    return `\n      <tr>\n        <td>${frappe.utils.escape_html(r.payment_type || \"\")}</td>\n        <td>${frappe.utils.escape_html(r.vendor || \"\")}</td>\n        <td style=\"text-align:right;\">${frappe.format(r.amount || 0, {fieldtype:\"Currency\"})}</td>\n        <td>${frappe.utils.escape_html(r.status || \"\")}</td>\n        <td>${frappe.utils.escape_html(r.paid_date || \"\")}</td>\n        <td>${frappe.utils.escape_html(r.reference || \"\")}</td>\n      </tr>`;\n  }).join(\"\");\n\n  panel.$wrapper.html(`\n    <div style=\"margin-bottom:8px;\">\n      <b>Payments for:</b> ${moment(month).format(\"MMM YYYY\")}\n      <span style=\"float:right;\"><b>Total:</b> ${frappe.format(total, {fieldtype:\"Currency\"})}</span>\n    </div>\n    <table class=\"table table-bordered\">\n      <thead>\n        <tr>\n          <th>Type</th><th>Vendor</th><th style=\"text-align:right;\">Amount</th><th>Status</th><th>Paid</th><th>Ref</th>\n        </tr>\n      </thead>\n      <tbody>${body || `<tr><td colspan=\"6\">No payments recorded for this month.</td></tr>`}</tbody>\n    </table>\n  `);\n}\n\nfrappe.ui.form.on(\"HRSN Case\", {\n  refresh(frm) {\n    // Row-click binding to set selected month from the child table\n    const grid = frm.fields_dict.billing_months && frm.fields_dict.billing_months.grid;\n    if (grid && grid.wrapper) {\n      // Avoid duplicate bindings on refresh\n      if (!frm.__month_click_bound) {\n        frm.__month_click_bound = true;\n\n        $(grid.wrapper).on(\"click\", \".grid-row\", function() {\n          const idx = $(this).attr(\"data-idx\"); // 1-based index\n          const row = (frm.doc.billing_months || []).find(r => String(r.idx) === String(idx));\n          if (row && row.billing_month) {\n            frm.set_value(\"selected_billing_month\", row.billing_month);\n            render_month_payments(frm);\n          }\n        });\n      }\n    }\n\n    render_month_payments(frm);\n  },\n\n  selected_billing_month(frm) {\n    render_month_payments(frm);\n  }\n});\n",
+  "view": "Form"
+ }
+]

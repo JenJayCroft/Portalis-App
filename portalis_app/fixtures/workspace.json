@@ -1,0 +1,194 @@
+[
+ {
+  "app": "portalis_app",
+  "charts": [],
+  "content": "[]",
+  "custom_blocks": [],
+  "docstatus": 0,
+  "doctype": "Workspace",
+  "external_link": null,
+  "for_user": null,
+  "hide_custom": 0,
+  "icon": null,
+  "indicator_color": "green",
+  "is_hidden": 0,
+  "label": "hrsn-billing",
+  "link_to": null,
+  "link_type": "DocType",
+  "links": [],
+  "modified": "2025-12-30 12:55:14.640814",
+  "module": "Client Management",
+  "name": "hrsn-billing",
+  "number_cards": [
+   {
+    "label": null,
+    "number_card_name": "Bills in Review"
+   },
+   {
+    "label": null,
+    "number_card_name": "Bills Need Info"
+   },
+   {
+    "label": null,
+    "number_card_name": "Bills Missing Invoice"
+   },
+   {
+    "label": null,
+    "number_card_name": "Approved Bills"
+   },
+   {
+    "label": null,
+    "number_card_name": "Payments Ready"
+   },
+   {
+    "label": null,
+    "number_card_name": "Payments Paid"
+   }
+  ],
+  "parent_page": null,
+  "public": 0,
+  "quick_lists": [
+   {
+    "document_type": "HRSN Client Bill",
+    "label": "Bills-Draft/In Review",
+    "quick_list_filter": "{\"workflow_state\":[\"in\",[\"Draft\",\"In Review\"]]}"
+   },
+   {
+    "document_type": "HRSN Client Bill",
+    "label": "Bills-Needs Info",
+    "quick_list_filter": "{\"workflow_state\":[\"=\",\"Needs Info\"]}\n"
+   },
+   {
+    "document_type": "HRSN Client Bill",
+    "label": "Bills-Approved",
+    "quick_list_filter": "{\"workflow_state\":[\"=\",\"Approved\"]}\n"
+   },
+   {
+    "document_type": "HRSN Client Bill",
+    "label": "Bills-Missing Invoice",
+    "quick_list_filter": "{\"invoice_attachment\":[\"=\",\"\"]}\n"
+   },
+   {
+    "document_type": "HRSN Client Bill",
+    "label": "Bills-Missing Verified W-9",
+    "quick_list_filter": "{\"vendor_w9\":[\"=\",\"\"]}\n"
+   },
+   {
+    "document_type": "HRSN Client Vendor Payment",
+    "label": "Payments-Ready",
+    "quick_list_filter": "{\"workflow_state\":[\"=\",\"Ready to Pay\"]}\n"
+   },
+   {
+    "document_type": "HRSN Client Vendor Payment",
+    "label": "Payments-Paid",
+    "quick_list_filter": "{\"workflow_state\":[\"=\",\"Paid\"]}\n"
+   },
+   {
+    "document_type": "HRSN Client Vendor Payment",
+    "label": "Payments-Missing Reference",
+    "quick_list_filter": "{\"payment_method\":[\"in\",[\"ACH\",\"Check\"]],\"payment_reference\":[\"=\",\"\"]}\n"
+   }
+  ],
+  "restrict_to_domain": null,
+  "roles": [
+   {
+    "role": "Billing Specialist"
+   },
+   {
+    "role": "Program Manager"
+   },
+   {
+    "role": "Data and Compliance"
+   }
+  ],
+  "sequence_id": 4.0,
+  "shortcuts": [
+   {
+    "color": null,
+    "doc_view": "New",
+    "format": null,
+    "icon": null,
+    "kanban_board": null,
+    "label": "Add Client Bill",
+    "link_to": "HRSN Client Bill",
+    "report_ref_doctype": null,
+    "restrict_to_domain": null,
+    "stats_filter": null,
+    "type": "DocType",
+    "url": null
+   },
+   {
+    "color": null,
+    "doc_view": "New",
+    "format": null,
+    "icon": null,
+    "kanban_board": null,
+    "label": "Pay Client Bills",
+    "link_to": "HRSN Client Vendor Payment",
+    "report_ref_doctype": null,
+    "restrict_to_domain": null,
+    "stats_filter": null,
+    "type": "DocType",
+    "url": null
+   },
+   {
+    "color": null,
+    "doc_view": "List",
+    "format": null,
+    "icon": null,
+    "kanban_board": null,
+    "label": "Bills",
+    "link_to": "HRSN Client Bill",
+    "report_ref_doctype": null,
+    "restrict_to_domain": null,
+    "stats_filter": null,
+    "type": "DocType",
+    "url": null
+   },
+   {
+    "color": null,
+    "doc_view": "List",
+    "format": null,
+    "icon": null,
+    "kanban_board": null,
+    "label": "Payments",
+    "link_to": "HRSN Client Vendor Payment",
+    "report_ref_doctype": null,
+    "restrict_to_domain": null,
+    "stats_filter": null,
+    "type": "DocType",
+    "url": null
+   },
+   {
+    "color": null,
+    "doc_view": "List",
+    "format": null,
+    "icon": null,
+    "kanban_board": null,
+    "label": "Vendors",
+    "link_to": "HRSN Vendor",
+    "report_ref_doctype": null,
+    "restrict_to_domain": null,
+    "stats_filter": null,
+    "type": "DocType",
+    "url": null
+   },
+   {
+    "color": null,
+    "doc_view": "List",
+    "format": null,
+    "icon": null,
+    "kanban_board": null,
+    "label": "Vendor W-9s",
+    "link_to": "HRSN Vendor W9",
+    "report_ref_doctype": null,
+    "restrict_to_domain": null,
+    "stats_filter": null,
+    "type": "DocType",
+    "url": null
+   }
+  ],
+  "title": "HRSN Billing",
+  "type": "Workspace"
+ }
+]
