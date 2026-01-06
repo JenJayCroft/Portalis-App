@@ -29,7 +29,7 @@ fixtures = [
     {"dt": "DocType", "filters": [["name", "in", PORTALIS_DOCTYPES]]},
 
     # 2) Customize Form artifacts
-    {"dt": "Custom Field", "filters": [["dt", "in", PORTALIS_DOCTYPES]]},
+    {"dt": "Custom Field", "filters": [["dt", "in", PORTALIS_DOCTYPES], ["fieldname", "not in", ["workflow_state"]]]},
     {"dt": "Property Setter", "filters": [["doc_type", "in", PORTALIS_DOCTYPES]]},
 
     # 3) Scripts
