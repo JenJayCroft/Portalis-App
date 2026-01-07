@@ -12,23 +12,82 @@ app_license = "mit"
 #   bench --site <site> export-fixtures --app portalis_app
 #
 
-PORTALIS_DOCTYPES = ["Client", "Client Bill and Ledger Submission", "Client Document Submission", "Client Intake Form - About Me", "Client Intake Form - Housing and Utilities","Client Intake Form - Income", "Client Intake Form - ROI Attestations and Certifications", "Client Vendor Accounts", "Client Management", "Household Income Entry", "Household Member", "Housing Service Option", "HRSN Activity Log", "HRSN Billing Month", "HRSN Case", "HRSN Client Bill", "HRSN Client Vendor Payment", "HRSN Month Payment", "HRSN Referrals", "HRSN Service Authorization", "HRSN Staff Coverage", "HRSN Vendor", "HRSN Vendor Contact Property", "HRSN Vendor Document", "HRSN Vendor Property", "HRSN Vendor W9"]
+PORTALIS_DOCTYPES = [
+    "Client",
+    "Client Bill and Ledger Submission",
+    "Client Document Submission",
+    "Client Intake Form - About Me",
+    "Client Intake Form - Housing and Utilities",
+    "Client Intake Form - Income",
+    "Client Intake Form - ROI Attestations and Certifications",
+    "Client Vendor Accounts",
+    "Client Management",
+    "Household Income Entry",
+    "Household Member",
+    "Housing Service Option",
+    "HRSN Activity Log",
+    "HRSN Billing Month",
+    "HRSN Case",
+    "HRSN Client Bill",
+    "HRSN Client Vendor Payment",
+    "HRSN Month Payment",
+    "HRSN Referrals",
+    "HRSN Service Authorization",
+    "HRSN Staff Coverage",
+    "HRSN Vendor",
+    "HRSN Vendor Contact Property",
+    "HRSN Vendor Document",
+    "HRSN Vendor Property",
+    "HRSN Vendor W9",
+]
 
-PORTALIS_WEB_FORMS = ["client-intake-packet-about-me", "client-intake-packet-housing-and-utilities", "client-intake-packet-income", "client-intake-packet-roi-attestations-certifications", "vendor-contact-my-profile", "vendor-document-upload"]
+PORTALIS_WEB_FORMS = [
+    "client-intake-packet-about-me",
+    "client-intake-packet-housing-and-utilities",
+    "client-intake-packet-income",
+    "client-intake-packet-roi-attestations-certifications",
+    "vendor-contact-my-profile",
+    "vendor-document-upload",
+]
 
-PORTALIS_WORKSPACES = ["hrsn-billing"]
+PORTALIS_WORKSPACES = [
+    "hrsn-billing",
+    # Add more workspace names here...
+]
 
-PORTALIS_PRINT_FORMATS = ["Trillium ROI", "YCCO HRSN Housing Service Plan", "YCCO ROI", "Zero Income Affidavit"]
+PORTALIS_PRINT_FORMATS = [
+    "Trillium ROI",
+    "YCCO HRSN Housing Service Plan",
+    "YCCO ROI",
+    "Zero Income Affidavit",
+]
 
-PORTALIS_ROLES = ["Case Manager", "Intake Specialist", "Billing Specialist", "Data and Compliance Specialist", "Program Manager", "Court Liaison", "Administrative Assistant"]
+PORTALIS_ROLES = [
+    "Case Manager",
+    "Intake Specialist",
+    "Billing Specialist",
+    "Data and Compliance Specialist",
+    "Program Manager",
+    "Court Liaison",
+    "Administrative Assistant",
+]
 
-PORTALIS_ROLE_PROFILES = ["Case Manager", "Intake Specialist", "Billing Specialist", "Data and Compliance Specialist", "Program Manager", "Court Liaison", "Administrative Assistant"]
+PORTALIS_ROLE_PROFILES = [
+    "Case Manager",
+    "Intake Specialist",
+    "Billing Specialist",
+    "Data and Compliance Specialist",
+    "Program Manager",
+    "Court Liaison",
+    "Administrative Assistant",
+]
 
 fixtures = [
     # 1) DocTypes (DB-defined DocTypes; bench export-fixtures will write JSON fixtures)
     {"dt": "DocType", "filters": [["name", "in", PORTALIS_DOCTYPES]]},
 
     # 2) Customize Form artifacts
+    # Exclude workflow_state Custom Fields (Workflow creates it; importing again causes duplicates)
     {"dt": "Custom Field", "filters": [["dt", "in", PORTALIS_DOCTYPES], ["fieldname", "not in", ["workflow_state"]]]},
     {"dt": "Property Setter", "filters": [["doc_type", "in", PORTALIS_DOCTYPES]]},
 
@@ -44,28 +103,36 @@ fixtures = [
     {"dt": "Workspace", "filters": [["name", "in", PORTALIS_WORKSPACES]]},
     {"dt": "Print Format", "filters": [["name", "in", PORTALIS_PRINT_FORMATS]]},
 
-    # 6) Permissions (only if you changed Role Permission Manager / Custom DocPerm)
+    # 6) Permissions (Role Permission Manager / Custom DocPerm changes)
     {"dt": "Custom DocPerm", "filters": [["parent", "in", PORTALIS_DOCTYPES]]},
-    
+
+    # 7) Roles / Role Profiles
     {"dt": "Role", "filters": [["name", "in", PORTALIS_ROLES]]},
-    {"dt": "Role Profile", "filters": [["name", "in", PORTALIS_ROLE_PROFILES]]}
+    {"dt": "Role Profile", "filters": [["name", "in", PORTALIS_ROLE_PROFILES]]},
 ]
+
 
 # Apps
 # ------------------
 
+# Each item in the list will be shown as an app in the apps page
+# NOTE: Keep route on something known-good unless you have a Workspace route you want to land on.
+#       If you later add a "Portalis" workspace with route "portalis", change route to "/app/portalis".
+add_to_apps_screen = [
+    {
+        "name": "portalis_app",
+        # If you add an icon at portalis_app/public/images/portalis-logo.svg (or .png), update this path:
+        # "logo": "/assets/portalis_app/images/portalis-logo.svg",
+        "logo": "/assets/portalis_app/images/portalis-logo.svg",
+        "title": "Portalis",
+        "route": "/app/home",
+        # Optional: only if you create this method in your app
+        # "has_permission": "portalis_app.api.permission.has_app_permission",
+    }
+]
+
 # required_apps = []
 
-# Each item in the list will be shown as an app in the apps page
-# add_to_apps_screen = [
-#       {
-#               "name": "portalis_app",
-#               "logo": "/assets/portalis_app/logo.png",
-#               "title": "Portalis",
-#               "route": "/portalis_app",
-#               "has_permission": "portalis_app.api.permission.has_app_permission"
-#       }
-# ]
 
 # Includes in <head>
 # ------------------
@@ -113,15 +180,12 @@ fixtures = [
 # Generators
 # ----------
 
-# automatically create page for each record of this doctype
 # website_generators = ["Web Page"]
 
-# automatically load and sync documents of this doctype from downstream apps
 # importable_doctypes = [doctype_1]
 
 # Jinja
 # ----------
-# add methods and filters to jinja environment
 # jinja = {
 #       "methods": "portalis_app.utils.jinja_methods",
 #       "filters": "portalis_app.utils.jinja_filters"
@@ -141,29 +205,23 @@ fixtures = [
 
 # Integration Setup
 # ------------------
-# To set up dependencies/integrations with other apps
-# Name of the app being installed is passed as an argument
 
 # before_app_install = "portalis_app.utils.before_app_install"
 # after_app_install = "portalis_app.utils.after_app_install"
 
 # Integration Cleanup
 # -------------------
-# To clean up dependencies/integrations with other apps
-# Name of the app being uninstalled is passed as an argument
 
 # before_app_uninstall = "portalis_app.utils.before_app_uninstall"
 # after_app_uninstall = "portalis_app.utils.after_app_uninstall"
 
 # Desk Notifications
 # ------------------
-# See frappe.core.notifications.get_notification_config
 
 # notification_config = "portalis_app.notifications.get_notification_config"
 
 # Permissions
 # -----------
-# Permissions evaluated in scripted ways
 
 # permission_query_conditions = {
 #       "Event": "frappe.desk.doctype.event.event.get_permission_query_conditions",
@@ -175,7 +233,6 @@ fixtures = [
 
 # Document Events
 # ---------------
-# Hook on document methods and events
 
 # doc_events = {
 #       "*": {
@@ -213,28 +270,22 @@ fixtures = [
 
 # Extend DocType Class
 # ------------------------------
-#
-# Specify custom mixins to extend the standard doctype controller.
+
 # extend_doctype_class = {
 #       "Task": "portalis_app.custom.task.CustomTaskMixin"
 # }
 
 # Overriding Methods
 # ------------------------------
-#
+
 # override_whitelisted_methods = {
 #       "frappe.desk.doctype.event.event.get_events": "portalis_app.event.get_events"
 # }
 #
-# each overriding function accepts a `data` argument;
-# generated from the base implementation of the doctype dashboard,
-# along with any modifications made in other Frappe apps
 # override_doctype_dashboards = {
 #       "Task": "portalis_app.task.get_dashboard_data"
 # }
 
-# exempt linked doctypes from being automatically cancelled
-#
 # auto_cancel_exempted_doctypes = ["Auto Repeat"]
 
 # Ignore links to specified DocTypes when deleting documents
@@ -274,7 +325,6 @@ fixtures = [
 #       "portalis_app.auth.validate"
 # ]
 
-# Automatically update python controller files with type annotations for this app.
 # export_python_type_annotations = True
 
 # default_log_clearing_doctypes = {
@@ -283,6 +333,4 @@ fixtures = [
 
 # Translation
 # ------------
-# List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
-
