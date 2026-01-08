@@ -62,6 +62,15 @@ PORTALIS_PRINT_FORMATS = [
     "Zero Income Affidavit",
 ]
 
+PORTALIS_NUMBER_CARDS = [
+    "Bills in Review",
+    "Bills Need Info",
+    "Bills Missing Invoice",
+    "Approved Bills",
+    "Payments Ready",
+    "Payments Paid"
+]
+
 PORTALIS_ROLES = [
     "Case Manager",
     "Intake Specialist",
@@ -109,6 +118,7 @@ fixtures = [
     # 7) Roles / Role Profiles
     {"dt": "Role", "filters": [["name", "in", PORTALIS_ROLES]]},
     {"dt": "Role Profile", "filters": [["name", "in", PORTALIS_ROLE_PROFILES]]},
+    {"dt": "Number Card", "filters": [["name", "in", PORTALIS_NUMBER_CARDS]]},
 ]
 
 
